@@ -81,16 +81,22 @@ RUN dnf install --setopt=install_weak_deps=False -y \
     dnf clean all && \
     rm -rf /tmp/* /var/tmp/* /var/cache
 
-# Enable login services
-RUN systemctl unmask getty.target console-getty.service systemd-logind.service && \
-    systemctl enable console-getty.service
-
 # Import updated libosinfo DB
 ARG OSINFO_DB=osinfo-db-20220516.tar.xz
-RUN curl -L -o ${OSINFO_DB} "https://releases.pagure.org/libosinfo/${OSINFO_DB}" && \
-    osinfo-db-import --system "${OSINFO_DB}"
+COPY ${OSINFO_DB} /root/
+RUN osinfo-db-import --system "/root/${OSINFO_DB}" && \
+    rm -rf "/root/${OSINFO_DB}"
 
-# Enable root autologin
+# Enable login services
+RUN systemctl unmask getty.target console-getty.service systemd-logind.service && \
+    systemctl enable console-getty.service && \
+# Don't run graphical target
+    systemctl set-default multi-user.target
+
+# Use the systemd halt.target for docker stop
+STOPSIGNAL SIGRTMIN+3
+
+# Enable root autologin and halt on shell exit
 COPY autologin.conf /etc/systemd/system/console-getty.service.d/
 
 # Apply some nice bash defaults
